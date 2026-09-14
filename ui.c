@@ -19,7 +19,8 @@ typedef enum {
   COLOR_PAIR_TSHAPE,
   COLOR_PAIR_SKEW,
   COLOR_PAIR_LSHAPE,
-  COLOR_PAIR_INVERSELSHAPE
+  COLOR_PAIR_INVERSELSHAPE,
+  COLOR_RESET
 } TetrominoColorPair;
 
 typedef struct TTShape {
@@ -79,13 +80,13 @@ int get_color_pair(Tetromino tt) {
   }
 }
 
-void wprint_tetronimo(WINDOW *local_win, int y, int x, Tetromino tt) {
+void wprint_tetronimo(WINDOW *local_win, Tetromino tt, int y, int x, int del) {
   int i = 0;
   int col = 0;
   int row = 0;
   ttshape *layout = get_ttshape(tt);
   int color_pair = get_color_pair(tt);
-    wattron(local_win, COLOR_PAIR(color_pair));
+    !del ? wattron(local_win, COLOR_PAIR(color_pair)) : wattron(local_win, COLOR_PAIR(0));
     for(i = 0; i < BLOCK_COUNT; i++) {
       col = layout[i].col * 2 + x;
       row = layout[i].row + y;
@@ -93,6 +94,11 @@ void wprint_tetronimo(WINDOW *local_win, int y, int x, Tetromino tt) {
     }
     wattroff(local_win, COLOR_PAIR(color_pair));
     wrefresh(local_win);
+}
+
+void wprint_shift_tetronimo(WINDOW *local_win, Tetromino tt, int is_left, int fact) {
+  wprint_tetronimo(local_win, SKEW, 8, 2, 0);
+  wprint_tetronimo(local_win, SKEW, 8, 2, 1);
 }
 
 WINDOW *create_newwin(int height, int width, int starty, int startx);
@@ -121,17 +127,12 @@ int main() {
   int main_height = 20;
 	int main_width = 22;
 	int main_starty = (LINES - main_height) / 2;
-	int main_startx = (COLS - main_width) / 2;	
+	int main_startx = (COLS - main_width) / 2;
   
   printw("press q to quit");
   refresh();
   main_win = create_newwin(main_height, main_width, main_starty, main_startx);
-  wprint_tetronimo(main_win, 1, 1, SQUARE);
-  wprint_tetronimo(main_win, 3, 3, STRAIGHT);
-  wprint_tetronimo(main_win, 4, 4, TSHAPE);
-  wprint_tetronimo(main_win, 7, 6, LSHAPE);
-  wprint_tetronimo(main_win, 8, 2, SKEW);
-  wprint_tetronimo(main_win, 10, 4, INVERSELSHAPE);
+
   while((c = wgetch(main_win)) != 'q') {
     wrefresh(main_win);
   }
