@@ -1,0 +1,1 @@
+gcc -Wall -Wextra -o cetris ui.c -lncursesw
