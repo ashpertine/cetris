@@ -31,6 +31,13 @@ typedef struct TTShape {
   int col;
 } ttshape;
 
+typedef struct TtShapeState {
+  Tetromino current_shape;
+  int x;
+  int y;
+  int longest_x;
+} ttshape_state;
+
 static ttshape STRAIGHT_LAYOUT[BLOCK_COUNT] = {{0, 0}, {0, 1}, {0, 2}, {0, 3}};
 
 static ttshape SQUARE_LAYOUT[BLOCK_COUNT] = {{0, 0}, {1, 0}, {0, 1}, {1, 1}};
@@ -84,42 +91,44 @@ int get_color_pair(Tetromino tt) {
   }
 }
 
-void wprint_tetromino(WINDOW *local_win, Tetromino tt, int *y, int *x,
-                      int *longest_x, int del) {
+void wprint_tetromino(WINDOW *local_win, ttshape_state *shape_state, int del) {
   int i = 0;
   int col = 0;
+  int longest_col = 0;
   int row = 0;
-  ttshape *layout = get_ttshape(tt);
-  int color_pair = get_color_pair(tt);
+  ttshape *layout = get_ttshape(shape_state->current_shape);
+  int color_pair = get_color_pair(shape_state->current_shape);
   int pair_to_use = del ? 0 : color_pair;
   wattrset(local_win, COLOR_PAIR(pair_to_use));
 
   for (i = 0; i < BLOCK_COUNT; i++) {
-    col = layout[i].col * 2 + *x;
-    *longest_x = col;
+    col = layout[i].col * 2 + shape_state->x;
+    longest_col = col > longest_col ? col : longest_col;
 
-    row = layout[i].row + *y;
+
+    row = layout[i].row + shape_state->y;
     refresh();
     mvwprintw(local_win, row, col, "  ");
   }
+
+  shape_state->longest_x = longest_col;
   wattrset(local_win, A_NORMAL);
   wrefresh(local_win);
 }
 
-void wprint_horiz_shift_tetromino(WINDOW *local_win, Tetromino tt, int *curr_y,
-                                  int *curr_x, int *longest_x, int is_left,
+void wprint_horiz_shift_tetromino(WINDOW *local_win, ttshape_state *shape_state, int is_left,
                                   int fact) {
-
+  int curr_x = shape_state->x;
   // delete by resetting colors to default
-  wprint_tetromino(local_win, tt, curr_y, curr_x, longest_x, 1);
+  wprint_tetromino(local_win, shape_state, 1);
   if (is_left) {
-    *curr_x = *curr_x - fact > 0 ? *curr_x - fact : *curr_x;
+    shape_state->x = curr_x - fact > 0 ? curr_x - fact : curr_x;
   } else {
-    *curr_x = *longest_x + fact < EFFECTIVE_WIDTH ? *curr_x + fact : *curr_x;
+    shape_state->x = shape_state->longest_x + fact < EFFECTIVE_WIDTH ? curr_x + fact : curr_x;
   }
 
   // set new position and print
-  wprint_tetromino(local_win, tt, curr_y, curr_x, longest_x, 0);
+  wprint_tetromino(local_win, shape_state, 0);
 }
 
 WINDOW *create_newwin(int height, int width, int starty, int startx);
@@ -150,21 +159,23 @@ int main() {
   int main_starty = (LINES - main_height) / 2;
   int main_startx = (COLS - main_width) / 2;
 
-  int block_x = 1;
-  int longest_x = 1;
-  int block_y = 1;
+  ttshape_state state = {
+    .current_shape = TSHAPE,
+    .x = 1,
+    .y = 1,
+    .longest_x = 1
+  };
+
   printw("press q to quit");
   refresh();
   main_win = create_newwin(main_height, main_width, main_starty, main_startx);
   keypad(main_win, TRUE);
-  wprint_tetromino(main_win, SKEW, &block_x, &block_y, &longest_x, 0);
+  wprint_tetromino(main_win, &state, 0);
   while ((c = wgetch(main_win)) != 'q') {
     if (c == KEY_LEFT) {
-      wprint_horiz_shift_tetromino(main_win, SKEW, &block_y, &block_x,
-                                   &longest_x, 1, 1);
+      wprint_horiz_shift_tetromino(main_win, &state, 1, 1);
     } else if (c == KEY_RIGHT) {
-      wprint_horiz_shift_tetromino(main_win, SKEW, &block_y, &block_x,
-                                   &longest_x, 0, 1);
+      wprint_horiz_shift_tetromino(main_win, &state, 0, 1);
     }
     wrefresh(main_win);
   }
