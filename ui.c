@@ -6,11 +6,9 @@
 
 #define COLOR_PINK 8
 #define BLOCK_COUNT 4
-#define AREA_HEIGHT 20
-#define AREA_WIDTH 22
+#define AREA_HEIGHT 18
+#define AREA_WIDTH 10
 #define NUM_TETROMINOS 7
-#define EFFECTIVE_HEIGHT AREA_HEIGHT - 2
-#define EFFECTIVE_WIDTH AREA_WIDTH - 2
 
 typedef enum {
   STRAIGHT,
@@ -48,6 +46,18 @@ typedef struct TtShapeState {
                    // needs to be changed for a new shape in the next iteration
 } ttshape_state;
 
+int internal_grid[AREA_HEIGHT][AREA_WIDTH] = {
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+};
+
 static ttshape STRAIGHT_LAYOUT[BLOCK_COUNT] = {{0, 0}, {0, 1}, {0, 2}, {0, 3}};
 static ttshape SQUARE_LAYOUT[BLOCK_COUNT] = {{0, 0}, {1, 0}, {0, 1}, {1, 1}};
 static ttshape TSHAPE_LAYOUT[BLOCK_COUNT] = {{1, 0}, {1, 1}, {1, 2}, {0, 1}};
@@ -59,6 +69,8 @@ static ttshape LSHAPE_LAYOUT[BLOCK_COUNT] = {{0, 0}, {0, 1}, {0, 2}, {1, 0}};
 
 static ttshape INVERSELSHAPE_LAYOUT[BLOCK_COUNT] = {
     {0, 0}, {0, 1}, {0, 2}, {1, 2}};
+
+WINDOW *create_newwin(int height, int width, int starty, int startx);
 
 ttshape *get_ttshape(Tetromino tt) {
   switch (tt) {
@@ -120,24 +132,29 @@ Tetromino get_rand_shape(Tetromino *prev_shape) {
 void wprint_tetromino(WINDOW *local_win, ttshape_state *shape_state, int del) {
   int i = 0;
   int col = 0;
+  int col_ui = 0; // ui representation of column; column on the ui has 1 extra
+                  // space than internal_grid
+  int row = 0;
   int longest_col = 0;
   int lowest_row = 0;
-  int row = 0;
+
   ttshape *layout = get_ttshape(shape_state->current_shape);
   int color_pair = get_color_pair(shape_state->current_shape);
   int pair_to_use = del ? 0 : color_pair;
   wattrset(local_win, COLOR_PAIR(pair_to_use));
 
+  // +1 ONLY FOR UI to compensate for the extra space due to the borders,
+  // internal grid starts at 0
   for (i = 0; i < BLOCK_COUNT; i++) {
-    col = layout[i].col * 2 + shape_state->x;
+    col_ui = layout[i].col * 2 + (shape_state->x * 2) + 1;
+    col = layout[i].col + shape_state->x;
     if (col > longest_col)
       longest_col = col;
-    row = layout[i].row + shape_state->y;
-    if (row > lowest_row)
-      lowest_row = row;
-
-    refresh();
-    mvwprintw(local_win, row, col, "  ");
+    row = layout[i].row + shape_state->y + 1;
+    if (row > lowest_row) {
+      lowest_row = row - 1; // get rid of the border
+    }
+    mvwprintw(local_win, row, col_ui, "  ");
   }
 
   shape_state->longest_x = longest_col;
@@ -147,14 +164,19 @@ void wprint_tetromino(WINDOW *local_win, ttshape_state *shape_state, int del) {
 }
 
 void wprint_horiz_shift_tetromino(WINDOW *local_win, ttshape_state *shape_state,
-                                  int is_left, int fact) {
+                                  int is_left) {
+  int fact = 1;
   int curr_x = shape_state->x;
   // delete by resetting colors to default
   wprint_tetromino(local_win, shape_state, 1);
   if (is_left) {
-    shape_state->x = curr_x - fact > 0 ? curr_x - fact : curr_x;
+    shape_state->x =
+        curr_x - fact >= 0 && !internal_grid[shape_state->y][curr_x - fact]
+            ? curr_x - fact
+            : curr_x;
   } else {
-    shape_state->x = shape_state->longest_x + fact < EFFECTIVE_WIDTH
+    shape_state->x = shape_state->longest_x + fact < AREA_WIDTH &&
+                             !internal_grid[shape_state->y][curr_x + fact]
                          ? curr_x + fact
                          : curr_x;
   }
@@ -163,22 +185,30 @@ void wprint_horiz_shift_tetromino(WINDOW *local_win, ttshape_state *shape_state,
   wprint_tetromino(local_win, shape_state, 0);
 }
 
-void wprint_lower_tetrimino(WINDOW *local_win, ttshape_state *shape_state,
-                            int fact) {
+void wprint_lower_tetrimino(WINDOW *local_win, ttshape_state *shape_state) {
   int curr_y = shape_state->y;
-  if (shape_state->lowest_y + fact > EFFECTIVE_HEIGHT) {
+  int reach = shape_state->lowest_y + 1;
+  if (reach >= AREA_HEIGHT) {
     shape_state->must_change = 1;
     return;
   }
 
+  ttshape *current_layout = get_ttshape(shape_state->current_shape);
+  for (int j = 0; j < BLOCK_COUNT; j++) {
+    if (internal_grid[shape_state->y + current_layout[j].row]
+                     [shape_state->x + current_layout[j].col]) {
+
+      shape_state->must_change = 1;
+      return;
+    }
+  }
+
   // delete by resetting colors to default
   wprint_tetromino(local_win, shape_state, 1);
-  shape_state->y = curr_y + fact;
+  shape_state->y = curr_y + 1;
 
   wprint_tetromino(local_win, shape_state, 0);
 }
-
-WINDOW *create_newwin(int height, int width, int starty, int startx);
 
 void init_settings(void) {
   setlocale(LC_ALL, "");
@@ -203,8 +233,8 @@ void init_settings(void) {
 
 WINDOW *init_main_win(void) {
   WINDOW *main_win;
-  int main_height = AREA_HEIGHT;
-  int main_width = AREA_WIDTH;
+  int main_height = AREA_HEIGHT + 2;
+  int main_width = AREA_WIDTH * 2 + 2;
   int main_starty = (LINES - main_height) / 2;
   int main_startx = (COLS - main_width) / 2;
   main_win = create_newwin(main_height, main_width, main_starty, main_startx);
@@ -216,8 +246,6 @@ WINDOW *init_main_win(void) {
 
 void init_main_win_act(WINDOW *main_win, ttshape_state *state) {
   int c;
-  int x_fact = 2;
-  int y_fact = 1;
   int running = 1;
   unsigned int tick_counter = 0;
   const int fall_interval = 20;
@@ -231,13 +259,13 @@ void init_main_win_act(WINDOW *main_win, ttshape_state *state) {
       break;
     case KEY_LEFT:
       /* code */
-      wprint_horiz_shift_tetromino(main_win, state, 1, x_fact);
+      wprint_horiz_shift_tetromino(main_win, state, 1);
       break;
     case KEY_RIGHT:
-      wprint_horiz_shift_tetromino(main_win, state, 0, x_fact);
+      wprint_horiz_shift_tetromino(main_win, state, 0);
       break;
     case KEY_DOWN:
-      wprint_lower_tetrimino(main_win, state, y_fact);
+      wprint_lower_tetrimino(main_win, state);
       break;
     default:
       break;
@@ -245,11 +273,21 @@ void init_main_win_act(WINDOW *main_win, ttshape_state *state) {
 
     tick_counter++;
     if (tick_counter >= (unsigned)fall_interval) {
-      wprint_lower_tetrimino(main_win, state, y_fact);
+      wprint_lower_tetrimino(main_win, state);
       tick_counter = 0;
+
+      // printw("layout_x: %d\n", state->x);
+      // printw("layout_longest_x: %d\n", state->longest_x);
+      // refresh();
     }
 
     if (state->must_change) {
+      ttshape *current_layout = get_ttshape(state->current_shape);
+      for (int i = 0; i < BLOCK_COUNT; i++) {
+        internal_grid[state->y + current_layout[i].row - 1]
+                     [state->x + current_layout[i].col] = 1;
+      }
+
       state->current_shape = get_rand_shape(NULL);
       state->x = 1;
       state->y = 1;
@@ -265,8 +303,8 @@ void init_main_win_act(WINDOW *main_win, ttshape_state *state) {
 int main() {
   init_settings();
   ttshape_state state = {.current_shape = get_rand_shape(NULL),
-                         .x = 1,
-                         .y = 1,
+                         .x = 0,
+                         .y = 0,
                          .longest_x = 0,
                          .lowest_y = 0};
 
