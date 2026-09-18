@@ -117,13 +117,12 @@ int get_color_pair(Tetromino tt) {
 }
 
 Tetromino get_rand_shape(Tetromino *prev_shape) {
-  srand(time(NULL));
   Tetromino new = (Tetromino)(rand() % NUM_TETROMINOS);
   if (prev_shape == NULL)
     return new;
 
   while (new == *prev_shape) {
-    new = (Tetromino)(rand() % (NUM_TETROMINOS + 1));
+    new = (Tetromino)(rand() % (NUM_TETROMINOS));
   }
 
   return new;
@@ -165,24 +164,28 @@ void wprint_tetromino(WINDOW *local_win, ttshape_state *shape_state, int del) {
 
 void wprint_horiz_shift_tetromino(WINDOW *local_win, ttshape_state *shape_state,
                                   int is_left) {
-  int fact = 1;
+  int fact = is_left ? -1 : 1;
   int curr_x = shape_state->x;
-  // delete by resetting colors to default
-  wprint_tetromino(local_win, shape_state, 1);
-  if (is_left) {
-    shape_state->x =
-        curr_x - fact >= 0 && !internal_grid[shape_state->y][curr_x - fact]
-            ? curr_x - fact
-            : curr_x;
-  } else {
-    shape_state->x = shape_state->longest_x + fact < AREA_WIDTH &&
-                             !internal_grid[shape_state->y][curr_x + fact]
-                         ? curr_x + fact
-                         : curr_x;
+  int should_mv = 1;
+  if ((!is_left && shape_state->longest_x + fact >= AREA_WIDTH) ||
+      (is_left && shape_state->x + fact < 0))
+    return;
+
+  ttshape *current_layout = get_ttshape(shape_state->current_shape);
+  for (int i = 0; i < BLOCK_COUNT; i++) {
+    if (internal_grid[shape_state->y + current_layout[i].row - 1]
+                     [shape_state->x + current_layout[i].col + fact]) {
+      should_mv = 0;
+    }
   }
 
-  // set new position and print
-  wprint_tetromino(local_win, shape_state, 0);
+  if (should_mv) {
+    // delete by resetting colors to default
+    wprint_tetromino(local_win, shape_state, 1);
+    shape_state->x = curr_x + fact;
+    // set new position and print
+    wprint_tetromino(local_win, shape_state, 0);
+  }
 }
 
 void wprint_lower_tetrimino(WINDOW *local_win, ttshape_state *shape_state) {
@@ -302,6 +305,7 @@ void init_main_win_act(WINDOW *main_win, ttshape_state *state) {
 
 int main() {
   init_settings();
+  srand(time(NULL));
   ttshape_state state = {.current_shape = get_rand_shape(NULL),
                          .x = 0,
                          .y = 0,
