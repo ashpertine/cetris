@@ -60,7 +60,7 @@ int internal_grid[AREA_HEIGHT][AREA_WIDTH] = {
 
 static ttshape STRAIGHT_LAYOUT[BLOCK_COUNT] = {{0, 0}, {0, 1}, {0, 2}, {0, 3}};
 static ttshape SQUARE_LAYOUT[BLOCK_COUNT] = {{0, 0}, {1, 0}, {0, 1}, {1, 1}};
-static ttshape TSHAPE_LAYOUT[BLOCK_COUNT] = {{1, 0}, {1, 1}, {1, 2}, {0, 1}};
+static ttshape TSHAPE_LAYOUT[BLOCK_COUNT] = {{0, 0}, {0, 1}, {0, 2}, {1, 1}};
 static ttshape SKEW_LAYOUT[BLOCK_COUNT] = {
     {0, 0}, {0, 1}, {1, 1}, {1, 2}}; // also known as Z
 static ttshape INVERSESKEW_LAYOUT[BLOCK_COUNT] = {
@@ -165,16 +165,16 @@ void wprint_tetromino(WINDOW *local_win, ttshape_state *shape_state, int del) {
 void wprint_horiz_shift_tetromino(WINDOW *local_win, ttshape_state *shape_state,
                                   int is_left) {
   int fact = is_left ? -1 : 1;
-  int curr_x = shape_state->x;
   int should_mv = 1;
   if ((!is_left && shape_state->longest_x + fact >= AREA_WIDTH) ||
       (is_left && shape_state->x + fact < 0))
     return;
 
   ttshape *current_layout = get_ttshape(shape_state->current_shape);
+  int x_after = shape_state->x + fact;
   for (int i = 0; i < BLOCK_COUNT; i++) {
-    if (internal_grid[shape_state->y + current_layout[i].row - 1]
-                     [shape_state->x + current_layout[i].col + fact]) {
+    if (internal_grid[shape_state->y + current_layout[i].row]
+                     [x_after + current_layout[i].col]) {
       should_mv = 0;
     }
   }
@@ -182,7 +182,7 @@ void wprint_horiz_shift_tetromino(WINDOW *local_win, ttshape_state *shape_state,
   if (should_mv) {
     // delete by resetting colors to default
     wprint_tetromino(local_win, shape_state, 1);
-    shape_state->x = curr_x + fact;
+    shape_state->x = shape_state->x + fact;
     // set new position and print
     wprint_tetromino(local_win, shape_state, 0);
   }
@@ -198,7 +198,7 @@ void wprint_lower_tetrimino(WINDOW *local_win, ttshape_state *shape_state) {
 
   ttshape *current_layout = get_ttshape(shape_state->current_shape);
   for (int j = 0; j < BLOCK_COUNT; j++) {
-    if (internal_grid[shape_state->y + current_layout[j].row]
+    if (internal_grid[shape_state->y + current_layout[j].row + 1]
                      [shape_state->x + current_layout[j].col]) {
 
       shape_state->must_change = 1;
@@ -287,13 +287,13 @@ void init_main_win_act(WINDOW *main_win, ttshape_state *state) {
     if (state->must_change) {
       ttshape *current_layout = get_ttshape(state->current_shape);
       for (int i = 0; i < BLOCK_COUNT; i++) {
-        internal_grid[state->y + current_layout[i].row - 1]
+        internal_grid[state->y + current_layout[i].row]
                      [state->x + current_layout[i].col] = 1;
       }
 
       state->current_shape = get_rand_shape(NULL);
-      state->x = 1;
-      state->y = 1;
+      state->x = 0;
+      state->y = 0;
       state->longest_x = 0;
       state->lowest_y = 0;
       state->must_change = 0;
