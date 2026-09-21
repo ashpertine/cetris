@@ -7,6 +7,7 @@
 #define COLOR_PINK 8
 #define BLOCK_COUNT 4
 #define MAX_ORIENTATIONS 4
+#define NUM_ROT_ATTEMPTS 5
 #define AREA_HEIGHT 18
 #define AREA_WIDTH 10
 #define NUM_TETROMINOS 7
@@ -145,40 +146,57 @@ static layout_set INVERSELSHAPE_LAYOUT = {
     .orientations = 4};
 
 // Wall kicks for normal pieces - spawn to clockwise rotation
-static ttpt WALL_KICK_0_R[5] = {{0, 0}, {0, -1}, {-1, -1}, {+2, 0}, {+2, -1}};
+static ttpt WALL_KICK_0_R[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, -1}, {-1, -1}, {+2, 0}, {+2, -1}};
 
-static ttpt WALL_KICK_R_0[5] = {{0, 0}, {0, +1}, {+1, +1}, {-2, 0}, {-2, +1}};
+static ttpt WALL_KICK_R_0[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, +1}, {+1, +1}, {-2, 0}, {-2, +1}};
 
-static ttpt WALL_KICK_R_2[5] = {{0, 0}, {0, -1}, {0, +2}, {-2, -1}, {+1, +2}};
+static ttpt WALL_KICK_R_2[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, -1}, {0, +2}, {-2, -1}, {+1, +2}};
 
-static ttpt WALL_KICK_2_R[5] = {{0, 0}, {0, +1}, {0, -2}, {+2, +1}, {-1, -2}};
+static ttpt WALL_KICK_2_R[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, +1}, {0, -2}, {+2, +1}, {-1, -2}};
 
-static ttpt WALL_KICK_2_L[5] = {{0, 0}, {0, +1}, {-1, +1}, {+2, 0}, {+2, +1}};
+static ttpt WALL_KICK_2_L[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, +1}, {-1, +1}, {+2, 0}, {+2, +1}};
 
-static ttpt WALL_KICK_L_2[5] = {{0, 0}, {0, -1}, {+1, -1}, {-2, 0}, {-2, -1}};
+static ttpt WALL_KICK_L_2[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, -1}, {+1, -1}, {-2, 0}, {-2, -1}};
 
-static ttpt WALL_KICK_L_0[5] = {{0, 0}, {0, -1}, {+1, -1}, {-2, 0}, {-2, -1}};
+static ttpt WALL_KICK_L_0[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, -1}, {+1, -1}, {-2, 0}, {-2, -1}};
 
-static ttpt WALL_KICK_0_L[5] = {{0, 0}, {0, +1}, {-1, +1}, {+2, 0}, {+2, +1}};
+static ttpt WALL_KICK_0_L[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, +1}, {-1, +1}, {+2, 0}, {+2, +1}};
 
 // Wall kicks for I piece.
-static ttpt WALL_KICK_I_0_R[5] = {{0, 0}, {0, -2}, {0, +1}, {+1, -2}, {-2, +1}};
+static ttpt WALL_KICK_I_0_R[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, -2}, {0, +1}, {+1, -2}, {-2, +1}};
 
-static ttpt WALL_KICK_I_R_0[5] = {{0, 0}, {0, +2}, {0, -1}, {-1, +2}, {+2, -1}};
+static ttpt WALL_KICK_I_R_0[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, +2}, {0, -1}, {-1, +2}, {+2, -1}};
 
-static ttpt WALL_KICK_I_R_2[5] = {{0, 0}, {0, -1}, {0, +2}, {-2, -1}, {+1, +2}};
+static ttpt WALL_KICK_I_R_2[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, -1}, {0, +2}, {-2, -1}, {+1, +2}};
 
-static ttpt WALL_KICK_I_2_R[5] = {{0, 0}, {0, +1}, {0, -2}, {+2, +1}, {-1, -2}};
+static ttpt WALL_KICK_I_2_R[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, +1}, {0, -2}, {+2, +1}, {-1, -2}};
 
-static ttpt WALL_KICK_I_2_L[5] = {{0, 0}, {0, +2}, {0, -1}, {-1, +2}, {+2, -1}};
+static ttpt WALL_KICK_I_2_L[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, +2}, {0, -1}, {-1, +2}, {+2, -1}};
 
-static ttpt WALL_KICK_I_L_2[5] = {{0, 0}, {0, -2}, {0, +1}, {+1, -2}, {-2, +1}};
+static ttpt WALL_KICK_I_L_2[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, -2}, {0, +1}, {+1, -2}, {-2, +1}};
 
-static ttpt WALL_KICK_I_L_0[5] = {{0, 0}, {0, +1}, {0, -2}, {-2, +1}, {+1, -2}};
+static ttpt WALL_KICK_I_L_0[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, +1}, {0, -2}, {-2, +1}, {+1, -2}};
 
-static ttpt WALL_KICK_I_0_L[5] = {{0, 0}, {0, -1}, {0, +2}, {+2, -1}, {-1, +2}};
+static ttpt WALL_KICK_I_0_L[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, -1}, {0, +2}, {+2, -1}, {-1, +2}};
 
-static ttpt WALL_KICK_FALLBACK[5] = {{0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}};
+static ttpt WALL_KICK_FALLBACK[NUM_ROT_ATTEMPTS] = {
+    {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}};
 
 WINDOW *create_newwin(int height, int width, int starty, int startx);
 
@@ -371,7 +389,7 @@ void attempt_rotation(ttshape_state *shape_state, Orientation new_rotate_ori) {
   int i_y = wall_kick_arr[0].row;
   ttpt *new_layout = shape_state->lo_set.layouts[new_rotate_ori];
 
-  for (int wall_kick_i = 0; wall_kick_i < 5; wall_kick_i++) {
+  for (int wall_kick_i = 0; wall_kick_i < NUM_ROT_ATTEMPTS; wall_kick_i++) {
     i_x = wall_kick_arr[wall_kick_i].col;
     i_y = wall_kick_arr[wall_kick_i].row;
     int rotation_available = 1;
