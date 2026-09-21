@@ -1,202 +1,10 @@
+#include "cetris.h"
+#include "layouts.h"
 #include <locale.h>
 #include <ncurses.h>
 #include <panel.h>
 #include <stdlib.h>
 #include <time.h>
-
-#define COLOR_PINK 8
-#define BLOCK_COUNT 4
-#define MAX_ORIENTATIONS 4
-#define NUM_ROT_ATTEMPTS 5
-#define AREA_HEIGHT 18
-#define AREA_WIDTH 10
-#define NUM_TETROMINOS 7
-
-typedef enum {
-  STRAIGHT,
-  SQUARE,
-  TSHAPE,
-  SKEW,        // also known as Z
-  INVERSESKEW, // also known as S
-  LSHAPE,
-  INVERSELSHAPE
-} Tetromino;
-
-typedef enum {
-  COLOR_PAIR_STRAIGHT = 1,
-  COLOR_PAIR_SQUARE,
-  COLOR_PAIR_TSHAPE,
-  COLOR_PAIR_SKEW,
-  COLOR_PAIR_INVERSESKEW,
-  COLOR_PAIR_LSHAPE,
-  COLOR_PAIR_INVERSELSHAPE,
-  COLOR_RESET
-} TetrominoColorPair;
-
-typedef enum {
-  SPAWN,
-  RIGHT,
-  TWO,
-  LEFT,
-} Orientation;
-
-typedef struct TtPoint {
-  int row;
-  int col;
-} ttpt;
-
-typedef struct LayoutSet {
-  Tetromino name;
-  ttpt layouts[MAX_ORIENTATIONS][BLOCK_COUNT];
-  int orientations;
-} layout_set;
-
-typedef struct TtShapeState {
-  layout_set lo_set;
-  Orientation ori;
-  int x;
-  int y;
-  int longest_x;
-  int lowest_y;
-  int must_change; // 0 if the current shape can continue to be used, 1 if it
-                   // needs to be changed for a new shape in the next iteration
-} ttshape_state;
-
-int internal_grid[AREA_HEIGHT][AREA_WIDTH] = {
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}, {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-};
-
-// Layout sets. Do not change the order.
-// each layout set starts from the spawn position and subsequent elements are
-// clockwise rotations from the previous element.
-static layout_set STRAIGHT_LAYOUT = {.name = STRAIGHT,
-                                     .layouts =
-                                         {
-                                             {{0, 0}, {0, 1}, {0, 2}, {0, 3}},
-                                             {{0, 0}, {1, 0}, {2, 0}, {3, 0}},
-                                             {{0, 0}, {0, 1}, {0, 2}, {0, 3}},
-                                             {{0, 0}, {1, 0}, {2, 0}, {3, 0}},
-                                         },
-                                     .orientations = 4};
-
-static layout_set SQUARE_LAYOUT = {
-    .name = SQUARE,
-    .layouts = {{{0, 0}, {1, 0}, {0, 1}, {1, 1}}},
-    .orientations = 1};
-
-static layout_set TSHAPE_LAYOUT = {.name = TSHAPE,
-                                   .layouts =
-                                       {
-                                           {{1, 0}, {1, 1}, {1, 2}, {0, 1}},
-                                           {{0, 0}, {1, 0}, {2, 0}, {1, 1}},
-                                           {{0, 0}, {0, 1}, {0, 2}, {1, 1}},
-                                           {{0, 1}, {1, 1}, {2, 1}, {1, 0}},
-                                       },
-                                   .orientations = 4};
-
-static layout_set SKEW_LAYOUT = { // also known as Z
-    .name = SKEW,
-    .layouts =
-        {
-            {{0, 0}, {0, 1}, {1, 1}, {1, 2}},
-            {{0, 1}, {1, 1}, {1, 0}, {2, 0}},
-            {{0, 0}, {0, 1}, {1, 1}, {1, 2}},
-            {{0, 1}, {1, 1}, {1, 0}, {2, 0}},
-        },
-    .orientations = 4};
-
-static layout_set INVERSESKEW_LAYOUT = { // also known as S
-    .name = INVERSESKEW,
-    .layouts =
-        {
-            {{1, 0}, {1, 1}, {0, 1}, {0, 2}},
-            {{0, 0}, {1, 0}, {1, 1}, {2, 1}},
-            {{1, 0}, {1, 1}, {0, 1}, {0, 2}},
-            {{0, 0}, {1, 0}, {1, 1}, {2, 1}},
-        },
-    .orientations = 4};
-
-static layout_set LSHAPE_LAYOUT = {.name = LSHAPE,
-                                   .layouts =
-                                       {
-                                           {{0, 2}, {1, 0}, {1, 1}, {1, 2}},
-                                           {{0, 0}, {1, 0}, {2, 0}, {2, 1}},
-                                           {{0, 0}, {0, 1}, {0, 2}, {1, 0}},
-                                           {{0, 0}, {0, 1}, {1, 1}, {2, 1}},
-                                       },
-                                   .orientations = 4};
-
-static layout_set INVERSELSHAPE_LAYOUT = {
-    .name = INVERSELSHAPE,
-    .layouts =
-        {
-            {{0, 0}, {1, 0}, {1, 1}, {1, 2}},
-            {{0, 0}, {0, 1}, {1, 0}, {2, 0}},
-            {{0, 0}, {0, 1}, {0, 2}, {1, 2}},
-            {{0, 1}, {1, 1}, {2, 0}, {2, 1}},
-        },
-    .orientations = 4};
-
-// Wall kicks for normal pieces - spawn to clockwise rotation
-static ttpt WALL_KICK_0_R[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, -1}, {-1, -1}, {+2, 0}, {+2, -1}};
-
-static ttpt WALL_KICK_R_0[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, +1}, {+1, +1}, {-2, 0}, {-2, +1}};
-
-static ttpt WALL_KICK_R_2[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, -1}, {0, +2}, {-2, -1}, {+1, +2}};
-
-static ttpt WALL_KICK_2_R[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, +1}, {0, -2}, {+2, +1}, {-1, -2}};
-
-static ttpt WALL_KICK_2_L[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, +1}, {-1, +1}, {+2, 0}, {+2, +1}};
-
-static ttpt WALL_KICK_L_2[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, -1}, {+1, -1}, {-2, 0}, {-2, -1}};
-
-static ttpt WALL_KICK_L_0[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, -1}, {+1, -1}, {-2, 0}, {-2, -1}};
-
-static ttpt WALL_KICK_0_L[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, +1}, {-1, +1}, {+2, 0}, {+2, +1}};
-
-// Wall kicks for I piece.
-static ttpt WALL_KICK_I_0_R[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, -2}, {0, +1}, {+1, -2}, {-2, +1}};
-
-static ttpt WALL_KICK_I_R_0[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, +2}, {0, -1}, {-1, +2}, {+2, -1}};
-
-static ttpt WALL_KICK_I_R_2[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, -1}, {0, +2}, {-2, -1}, {+1, +2}};
-
-static ttpt WALL_KICK_I_2_R[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, +1}, {0, -2}, {+2, +1}, {-1, -2}};
-
-static ttpt WALL_KICK_I_2_L[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, +2}, {0, -1}, {-1, +2}, {+2, -1}};
-
-static ttpt WALL_KICK_I_L_2[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, -2}, {0, +1}, {+1, -2}, {-2, +1}};
-
-static ttpt WALL_KICK_I_L_0[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, +1}, {0, -2}, {-2, +1}, {+1, -2}};
-
-static ttpt WALL_KICK_I_0_L[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, -1}, {0, +2}, {+2, -1}, {-1, +2}};
-
-static ttpt WALL_KICK_FALLBACK[NUM_ROT_ATTEMPTS] = {
-    {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}};
 
 WINDOW *create_newwin(int height, int width, int starty, int startx);
 
@@ -245,9 +53,8 @@ int get_color_pair(Tetromino tt) {
 }
 
 layout_set get_rand_lo_set(void) {
-  // Tetromino new = (Tetromino)(rand() % NUM_TETROMINOS);
-  // return get_ttlayout(new);
-  return get_ttlayout(STRAIGHT);
+  Tetromino new = (Tetromino)(rand() % NUM_TETROMINOS);
+  return get_ttlayout(new);
 }
 
 void wprint_tetromino(WINDOW *local_win, ttshape_state *shape_state, int del) {
@@ -341,9 +148,6 @@ Orientation get_new_rotate_ori(Orientation ori, int anti_clockwise) {
 }
 
 ttpt *get_wall_kick(Orientation new_rotate_ori, ttshape_state *shape_state) {
-  printw("old_rotate_ori: %d\n", shape_state->ori);
-  printw("new_rotate_ori: %d\n", new_rotate_ori);
-  refresh();
   Orientation curr_ori = shape_state->ori;
   int is_I = shape_state->lo_set.name == STRAIGHT;
   if (new_rotate_ori == RIGHT) {
