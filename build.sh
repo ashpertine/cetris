@@ -1,1 +1,1 @@
-gcc -Wall -Wextra -o cetris ui.c -lncursesw
+gcc -Wall -Wextra -o cetris ui.c -lncursesw -fsanitize=address
