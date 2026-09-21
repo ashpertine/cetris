@@ -36,6 +36,13 @@ typedef enum
   COLOR_RESET
 } TetrominoColorPair;
 
+typedef enum {
+  SPAWN,
+  RIGHT,
+  TWO,
+  LEFT,
+} Orientation;
+
 typedef struct TtPoint
 {
   int row;
@@ -51,7 +58,7 @@ typedef struct LayoutSet {
 typedef struct TtShapeState
 {
   layout_set lo_set;
-  int ori;
+  Orientation ori;
   int x;
   int y;
   int longest_x;
@@ -81,6 +88,8 @@ int internal_grid[AREA_HEIGHT][AREA_WIDTH] = {
     {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 };
 
+// Layout sets. Do not change the order.
+// each layout set starts from the spawn position and subsequent elements are clockwise rotations from the previous element.
 static layout_set STRAIGHT_LAYOUT= {
   .name = STRAIGHT,
   .layouts = {
@@ -101,10 +110,10 @@ static layout_set SQUARE_LAYOUT = {
 static layout_set TSHAPE_LAYOUT = {
   .name = TSHAPE,
   .layouts = {
+    {{1, 0}, {1, 1}, {1, 2}, {0, 1}},
+    {{0, 0}, {1, 0}, {2, 0}, {1, 1}},
     {{0, 0}, {0, 1}, {0, 2}, {1, 1}},
     {{0, 1}, {1, 1}, {2, 1}, {1, 0}},
-    {{1, 0}, {1, 1}, {1, 2}, {0, 1}},
-    {{0, 0}, {1, 0}, {2, 0}, {1, 1}}
   },
   .orientations = 4
 };
@@ -114,26 +123,30 @@ static layout_set SKEW_LAYOUT = { // also known as Z
   .layouts = {
     {{0, 0}, {0, 1}, {1, 1}, {1, 2}},
     {{0, 1}, {1, 1}, {1, 0}, {2, 0}},
+    {{0, 0}, {0, 1}, {1, 1}, {1, 2}},
+    {{0, 1}, {1, 1}, {1, 0}, {2, 0}},
   },
-  .orientations = 2
+  .orientations = 4
 };
 
 static layout_set INVERSESKEW_LAYOUT = { // also known as S
   .name = INVERSESKEW,
   .layouts = {
     {{1, 0}, {1, 1}, {0, 1}, {0, 2}},
-    {{0, 0}, {1, 0}, {1, 1}, {2, 1}}
+    {{0, 0}, {1, 0}, {1, 1}, {2, 1}},
+    {{1, 0}, {1, 1}, {0, 1}, {0, 2}},
+    {{0, 0}, {1, 0}, {1, 1}, {2, 1}},
   },
-  .orientations = 2
+  .orientations = 4
 };
 
 static layout_set LSHAPE_LAYOUT = {
   .name = LSHAPE,
   .layouts = {
-    {{0, 0}, {0, 1}, {0, 2}, {1, 0}},
-    {{0, 0}, {0, 1}, {1, 1}, {2, 1}},
-    {{0, 2}, {1, 0}, {1, 1}, {1, 2}},
+    {{0, 2}, {1, 0}, {1, 1}, {1, 2}},  
     {{0, 0}, {1, 0}, {2, 0}, {2, 1}},
+    {{0, 0}, {0, 1}, {0, 2}, {1, 0}},  
+    {{0, 0}, {0, 1}, {1, 1}, {2, 1}},  
   },
   .orientations = 4
 };
@@ -141,12 +154,78 @@ static layout_set LSHAPE_LAYOUT = {
 static layout_set INVERSELSHAPE_LAYOUT = {
   .name = INVERSELSHAPE,
   .layouts = {
-      {{0, 0}, {0, 1}, {0, 2}, {1, 2}},
-      {{0, 1}, {1, 1}, {2, 0}, {2, 1}},
-      {{0, 0}, {1, 0}, {1, 1}, {1, 2}},
-      {{0, 0}, {0, 1}, {1, 0}, {2, 0}},
+    {{0, 0}, {1, 0}, {1, 1}, {1, 2}},  
+    {{0, 0}, {0, 1}, {1, 0}, {2, 0}},  
+    {{0, 0}, {0, 1}, {0, 2}, {1, 2}},
+    {{0, 1}, {1, 1}, {2, 0}, {2, 1}},  
   },
   .orientations = 4
+};
+
+// Wall kicks for normal pieces - spawn to clockwise rotation
+static ttpt WALL_KICK_0_R[5] = {
+  {0, 0}, {0, -1}, {-1, -1}, {+2, 0}, {+2, -1}
+};
+
+static ttpt WALL_KICK_R_0[5] = {
+  {0, 0}, {0, +1}, {+1, +1}, {-2, 0}, {-2, +1}
+};
+
+static ttpt WALL_KICK_R_2[5] = {
+  {0, 0}, {0, -1}, {0, +2}, {-2, -1}, {+1, +2}
+};
+
+static ttpt WALL_KICK_2_R[5] = {
+  {0, 0}, {0, +1}, {0, -2}, {+2, +1}, {-1, -2}
+};
+
+static ttpt WALL_KICK_2_L[5] = {
+  {0, 0}, {0, +1}, {-1, +1}, {+2, 0}, {+2, +1}
+};
+
+static ttpt WALL_KICK_L_2[5] = {
+  {0, 0}, {0, -1}, {+1, -1}, {-2, 0}, {-2, -1}
+};
+
+static ttpt WALL_KICK_L_0[5] = {
+  {0, 0}, {0, -1}, {+1, -1}, {-2, 0}, {-2, -1}
+};
+
+static ttpt WALL_KICK_0_L[5] = {
+  {0, 0}, {0, +1}, {-1, +1}, {+2, 0}, {+2, +1}
+};
+
+// Wall kicks for I piece.
+static ttpt WALL_KICK_I_0_R[5] = {
+  {0, 0}, {0, -2}, {0, +1}, {+1, -2}, {-2, +1}
+};
+
+static ttpt WALL_KICK_I_R_0[5] = {
+  {0, 0}, {0, +2}, {0, -1}, {-1, +2}, {+2, -1}
+};
+
+static ttpt WALL_KICK_I_R_2[5] = {
+  {0, 0}, {0, -1}, {0, +2}, {-2, -1}, {+1, +2}
+};
+
+static ttpt WALL_KICK_I_2_R[5] = {
+  {0, 0}, {0, +1}, {0, -2}, {+2, +1}, {-1, -2}
+};
+
+static ttpt WALL_KICK_I_2_L[5] = {
+  {0, 0}, {0, +2}, {0, -1}, {-1, +2}, {+2, -1}
+};
+
+static ttpt WALL_KICK_I_L_2[5] = {
+  {0, 0}, {0, -2}, {0, +1}, {+1, -2}, {-2, +1}
+};
+
+static ttpt WALL_KICK_I_L_0[5] = {
+  {0, 0}, {0, +1}, {0, -2}, {-2, +1}, {+1, -2}
+};
+
+static ttpt WALL_KICK_I_0_L[5] = {
+  {0, 0}, {0, -1}, {0, +2}, {+2, -1}, {-1, +2}
 };
 
 
@@ -302,22 +381,34 @@ void wprint_lower_tetrimino(WINDOW *local_win, ttshape_state *shape_state)
   wprint_tetromino(local_win, shape_state, 0);
 }
 
-void wprint_rotate_tetrimino(WINDOW *local_win, ttshape_state *shape_state, int anti_clockwise) {
+int get_new_rotate_ori(int ori, int max_ori, int anti_clockwise) {
   // anti_clockwise = -1 orientation, clockwise = +1 orientation
+  int curr_ori = ori;
+  if(curr_ori == SPAWN && anti_clockwise) {
+    curr_ori = max_ori;
+  }else if(curr_ori == max_ori && !anti_clockwise) {
+    curr_ori = 0;
+  }else {
+    curr_ori = anti_clockwise ? curr_ori - 1 : curr_ori + 1;
+  }
+
+  return curr_ori;
+}
+
+// void rotate(int new_rotate_ori, ttshape_state *shape_state, int anti_clockwise) {
+
+// }
+
+void wprint_rotate_tetrimino(WINDOW *local_win, ttshape_state *shape_state, int anti_clockwise) {
+  if(shape_state->lo_set.name == SQUARE) return;
+
   int curr_ori = shape_state->ori;
-  int max_ori = shape_state->lo_set.orientations - 1;
+  int max_ori = shape_state->lo_set.orientations -1;
+  int new_rotate_ori = get_new_rotate_ori(curr_ori, max_ori, anti_clockwise);
 
   // delete by resetting colors to default
   wprint_tetromino(local_win, shape_state, 1);
-
-  if(curr_ori == 0 && anti_clockwise) {
-    shape_state->ori = max_ori;
-  }else if(curr_ori == max_ori && !anti_clockwise) {
-    shape_state->ori = 0;
-  }else {
-    shape_state->ori = anti_clockwise ? curr_ori - 1 : curr_ori + 1;
-  }
-
+  shape_state->ori = new_rotate_ori;
   wprint_tetromino(local_win, shape_state, 0);
 }
 
@@ -363,7 +454,7 @@ ttshape_state init_shape_state(void)
 
   ttshape_state state = {
       .lo_set = og_layout_set,
-      .ori = 0,
+      .ori = SPAWN,
       .x = 0,
       .y = 0,
       .longest_x = 0,
@@ -414,10 +505,6 @@ void init_main_win_act(WINDOW *main_win, ttshape_state *state)
     {
       wprint_lower_tetrimino(main_win, state);
       tick_counter = 0;
-
-      // printw("layout_x: %d\n", state->x);
-      // printw("layout_longest_x: %d\n", state->longest_x);
-      // refresh();
     }
 
     if (state->must_change)
