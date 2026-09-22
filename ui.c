@@ -1,6 +1,6 @@
 #include "cetris.h"
-#include "layouts.h"
 #include "grid.h"
+#include "layouts.h"
 #include <locale.h>
 #include <ncurses.h>
 #include <panel.h>
@@ -8,10 +8,30 @@
 #include <time.h>
 
 WINDOW *create_newwin(int height, int width, int starty, int startx);
+WINDOW *init_main_win(void);
 
 layout_set get_rand_lo_set(void) {
   Tetromino new = (Tetromino)(rand() % NUM_TETROMINOS);
   return get_ttlayout(new);
+}
+
+void wprint_rerender_grid(WINDOW *local_win) {
+  werase(local_win);
+  box(local_win, 0, 0);
+  wrefresh(local_win);
+
+  // repaint window
+  for (int row_i = AREA_HEIGHT - 1; row_i >= 0; row_i--) {
+    for (int col_i = 0; col_i < AREA_WIDTH; col_i++) {
+      TetrominoColorPair color_pair = internal_grid[row_i][col_i].color;
+      int col_ui = col_i * 2 + 1;
+      wattrset(local_win, COLOR_PAIR(color_pair));
+      mvwprintw(local_win, row_i + 1, col_ui, "  ");
+      wattrset(local_win, A_NORMAL);
+    }
+  }
+
+  wrefresh(local_win);
 }
 
 void wprint_tetromino(WINDOW *local_win, ttshape_state *shape_state, int del) {
@@ -24,7 +44,7 @@ void wprint_tetromino(WINDOW *local_win, ttshape_state *shape_state, int del) {
   int lowest_row = 0;
 
   ttpt *layout = shape_state->lo_set.layouts[shape_state->ori];
-  int color_pair = get_color_pair(shape_state->lo_set.name);
+  TetrominoColorPair color_pair = get_color_pair(shape_state->lo_set.name);
   int pair_to_use = del ? 0 : color_pair;
   wattrset(local_win, COLOR_PAIR(pair_to_use));
 
@@ -60,7 +80,8 @@ void wprint_horiz_shift_tetromino(WINDOW *local_win, ttshape_state *shape_state,
   int x_after = shape_state->x + fact;
   for (int i = 0; i < BLOCK_COUNT; i++) {
     if (internal_grid[shape_state->y + current_layout[i].row]
-                     [x_after + current_layout[i].col].occ) {
+                     [x_after + current_layout[i].col]
+                         .occ) {
       should_mv = 0;
     }
   }
@@ -85,7 +106,8 @@ void wprint_lower_tetrimino(WINDOW *local_win, ttshape_state *shape_state) {
   ttpt *current_layout = shape_state->lo_set.layouts[shape_state->ori];
   for (int j = 0; j < BLOCK_COUNT; j++) {
     if (internal_grid[shape_state->y + current_layout[j].row + 1]
-                     [shape_state->x + current_layout[j].col].occ) {
+                     [shape_state->x + current_layout[j].col]
+                         .occ) {
 
       shape_state->must_change = 1;
       return;
@@ -248,11 +270,18 @@ void init_main_win_act(WINDOW *main_win, ttshape_state *state) {
         int aff_row = state->y + state->lo_set.layouts[state->ori][i].row;
         int aff_col = state->x + state->lo_set.layouts[state->ori][i].col;
         internal_grid[aff_row][aff_col].occ = 1;
-        internal_grid[aff_row][aff_col].color = get_color_pair(state->lo_set.name);
-        
+        internal_grid[aff_row][aff_col].color =
+            get_color_pair(state->lo_set.name);
       }
 
       *state = init_shape_state();
+
+      // clear empty rows
+      int has_changed = clear_internal_empty_rows(internal_grid);
+      if (has_changed) {
+        flush_internal_empty_rows(internal_grid);
+        wprint_rerender_grid(main_win);
+      }
     }
 
     wrefresh(main_win);
