@@ -1,5 +1,6 @@
 #include "cetris.h"
 #include "layouts.h"
+#include "grid.h"
 #include <locale.h>
 #include <ncurses.h>
 #include <panel.h>
@@ -7,50 +8,6 @@
 #include <time.h>
 
 WINDOW *create_newwin(int height, int width, int starty, int startx);
-
-layout_set get_ttlayout(Tetromino tt) {
-  switch (tt) {
-  case STRAIGHT:
-    return STRAIGHT_LAYOUT;
-  case SQUARE:
-    return SQUARE_LAYOUT;
-  case TSHAPE:
-    return TSHAPE_LAYOUT;
-  case SKEW:
-    return SKEW_LAYOUT;
-  case INVERSESKEW:
-    return INVERSESKEW_LAYOUT;
-  case LSHAPE:
-    return LSHAPE_LAYOUT;
-  case INVERSELSHAPE:
-    return INVERSELSHAPE_LAYOUT;
-  default:
-    return STRAIGHT_LAYOUT;
-    break;
-  }
-}
-
-int get_color_pair(Tetromino tt) {
-  switch (tt) {
-  case STRAIGHT:
-    return COLOR_PAIR_STRAIGHT;
-  case SQUARE:
-    return COLOR_PAIR_SQUARE;
-  case TSHAPE:
-    return COLOR_PAIR_TSHAPE;
-  case SKEW:
-    return COLOR_PAIR_SKEW;
-  case INVERSESKEW:
-    return COLOR_PAIR_INVERSESKEW;
-  case LSHAPE:
-    return COLOR_PAIR_LSHAPE;
-  case INVERSELSHAPE:
-    return COLOR_PAIR_INVERSELSHAPE;
-  default:
-    return 0;
-    break;
-  }
-}
 
 layout_set get_rand_lo_set(void) {
   Tetromino new = (Tetromino)(rand() % NUM_TETROMINOS);
@@ -103,7 +60,7 @@ void wprint_horiz_shift_tetromino(WINDOW *local_win, ttshape_state *shape_state,
   int x_after = shape_state->x + fact;
   for (int i = 0; i < BLOCK_COUNT; i++) {
     if (internal_grid[shape_state->y + current_layout[i].row]
-                     [x_after + current_layout[i].col]) {
+                     [x_after + current_layout[i].col].occ) {
       should_mv = 0;
     }
   }
@@ -128,7 +85,7 @@ void wprint_lower_tetrimino(WINDOW *local_win, ttshape_state *shape_state) {
   ttpt *current_layout = shape_state->lo_set.layouts[shape_state->ori];
   for (int j = 0; j < BLOCK_COUNT; j++) {
     if (internal_grid[shape_state->y + current_layout[j].row + 1]
-                     [shape_state->x + current_layout[j].col]) {
+                     [shape_state->x + current_layout[j].col].occ) {
 
       shape_state->must_change = 1;
       return;
@@ -145,42 +102,6 @@ Orientation get_new_rotate_ori(Orientation ori, int anti_clockwise) {
   // anti_clockwise = -1 orientation, clockwise = +1 orientation
   return anti_clockwise ? (ori + (MAX_ORIENTATIONS)-1) % MAX_ORIENTATIONS
                         : (ori + 1) % MAX_ORIENTATIONS;
-}
-
-ttpt *get_wall_kick(Orientation new_rotate_ori, ttshape_state *shape_state) {
-  Orientation curr_ori = shape_state->ori;
-  int is_I = shape_state->lo_set.name == STRAIGHT;
-  if (new_rotate_ori == RIGHT) {
-
-    if (curr_ori == SPAWN) {
-      return is_I ? WALL_KICK_I_0_R : WALL_KICK_0_R;
-    } else if (curr_ori == TWO) {
-      return is_I ? WALL_KICK_I_2_R : WALL_KICK_2_R;
-    }
-  } else if (new_rotate_ori == LEFT) {
-
-    if (curr_ori == SPAWN) {
-      return is_I ? WALL_KICK_I_0_L : WALL_KICK_0_L;
-    } else if (curr_ori == TWO) {
-      return is_I ? WALL_KICK_I_2_L : WALL_KICK_2_L;
-    }
-  } else if (new_rotate_ori == TWO) {
-
-    if (curr_ori == RIGHT) {
-      return is_I ? WALL_KICK_I_R_2 : WALL_KICK_R_2;
-    } else if (curr_ori == LEFT) {
-      return is_I ? WALL_KICK_I_L_2 : WALL_KICK_L_2;
-    }
-  } else { // spawn
-
-    if (curr_ori == RIGHT) {
-      return is_I ? WALL_KICK_I_R_0 : WALL_KICK_R_0;
-    } else if (curr_ori == LEFT) {
-      return is_I ? WALL_KICK_I_L_0 : WALL_KICK_L_0;
-    }
-  }
-
-  return WALL_KICK_FALLBACK;
 }
 
 void attempt_rotation(ttshape_state *shape_state, Orientation new_rotate_ori) {
@@ -203,7 +124,7 @@ void attempt_rotation(ttshape_state *shape_state, Orientation new_rotate_ori) {
       int c = new_layout[j].col + curr_x + i_x;
 
       if (r < 0 || r >= AREA_HEIGHT || c < 0 || c >= AREA_WIDTH ||
-          internal_grid[r][c]) {
+          internal_grid[r][c].occ) {
         rotation_available = 0;
         break;
       }
@@ -324,8 +245,11 @@ void init_main_win_act(WINDOW *main_win, ttshape_state *state) {
 
     if (state->must_change) {
       for (int i = 0; i < BLOCK_COUNT; i++) {
-        internal_grid[state->y + state->lo_set.layouts[state->ori][i].row]
-                     [state->x + state->lo_set.layouts[state->ori][i].col] = 1;
+        int aff_row = state->y + state->lo_set.layouts[state->ori][i].row;
+        int aff_col = state->x + state->lo_set.layouts[state->ori][i].col;
+        internal_grid[aff_row][aff_col].occ = 1;
+        internal_grid[aff_row][aff_col].color = get_color_pair(state->lo_set.name);
+        
       }
 
       *state = init_shape_state();

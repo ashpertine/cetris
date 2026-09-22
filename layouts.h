@@ -29,3 +29,6 @@ extern ttpt WALL_KICK_I_L_2[NUM_ROT_ATTEMPTS];
 extern ttpt WALL_KICK_I_L_0[NUM_ROT_ATTEMPTS];
 extern ttpt WALL_KICK_I_0_L[NUM_ROT_ATTEMPTS];
 extern ttpt WALL_KICK_FALLBACK[NUM_ROT_ATTEMPTS];
+
+layout_set get_ttlayout(Tetromino tt);
+ttpt *get_wall_kick(Orientation new_rotate_ori, ttshape_state *shape_state);

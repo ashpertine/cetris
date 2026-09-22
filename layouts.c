@@ -121,3 +121,61 @@ ttpt WALL_KICK_I_0_L[NUM_ROT_ATTEMPTS] = {
 
 ttpt WALL_KICK_FALLBACK[NUM_ROT_ATTEMPTS] = {
     {0, 0}, {0, 0}, {0, 0}, {0, 0}, {0, 0}};
+
+layout_set get_ttlayout(Tetromino tt) {
+  switch (tt) {
+  case STRAIGHT:
+    return STRAIGHT_LAYOUT;
+  case SQUARE:
+    return SQUARE_LAYOUT;
+  case TSHAPE:
+    return TSHAPE_LAYOUT;
+  case SKEW:
+    return SKEW_LAYOUT;
+  case INVERSESKEW:
+    return INVERSESKEW_LAYOUT;
+  case LSHAPE:
+    return LSHAPE_LAYOUT;
+  case INVERSELSHAPE:
+    return INVERSELSHAPE_LAYOUT;
+  default:
+    return STRAIGHT_LAYOUT;
+    break;
+  }
+}
+
+ttpt *get_wall_kick(Orientation new_rotate_ori, ttshape_state *shape_state) {
+  Orientation curr_ori = shape_state->ori;
+  int is_I = shape_state->lo_set.name == STRAIGHT;
+  if (new_rotate_ori == RIGHT) {
+
+    if (curr_ori == SPAWN) {
+      return is_I ? WALL_KICK_I_0_R : WALL_KICK_0_R;
+    } else if (curr_ori == TWO) {
+      return is_I ? WALL_KICK_I_2_R : WALL_KICK_2_R;
+    }
+  } else if (new_rotate_ori == LEFT) {
+
+    if (curr_ori == SPAWN) {
+      return is_I ? WALL_KICK_I_0_L : WALL_KICK_0_L;
+    } else if (curr_ori == TWO) {
+      return is_I ? WALL_KICK_I_2_L : WALL_KICK_2_L;
+    }
+  } else if (new_rotate_ori == TWO) {
+
+    if (curr_ori == RIGHT) {
+      return is_I ? WALL_KICK_I_R_2 : WALL_KICK_R_2;
+    } else if (curr_ori == LEFT) {
+      return is_I ? WALL_KICK_I_L_2 : WALL_KICK_L_2;
+    }
+  } else { // spawn
+
+    if (curr_ori == RIGHT) {
+      return is_I ? WALL_KICK_I_R_0 : WALL_KICK_R_0;
+    } else if (curr_ori == LEFT) {
+      return is_I ? WALL_KICK_I_L_0 : WALL_KICK_L_0;
+    }
+  }
+
+  return WALL_KICK_FALLBACK;
+}

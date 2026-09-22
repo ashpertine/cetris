@@ -58,4 +58,9 @@ typedef struct TtShapeState {
                    // needs to be changed for a new shape in the next iteration
 } ttshape_state;
 
-extern int internal_grid[AREA_HEIGHT][AREA_WIDTH];
+typedef struct GridPoint {
+   int occ;
+   TetrominoColorPair color;
+} gridpoint;
+
+TetrominoColorPair get_color_pair(Tetromino tt);
